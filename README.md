@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Eva's Closet - E-commerce Platform
 
 An e-commerce platform for selling clothes, built with Next.js, Prisma, SQLite, Stripe, and Nodemailer.
