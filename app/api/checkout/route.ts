@@ -28,15 +28,17 @@ export async function POST(request: Request) {
     }
 
     const productIds = items.map((item) => item.productId)
+    const uniqueProductIds = Array.from(new Set(productIds))
+
     const products = await prisma.product.findMany({
       where: {
         id: {
-          in: productIds,
+          in: uniqueProductIds,
         },
       },
     })
 
-    if (products.length !== items.length) {
+    if (products.length !== uniqueProductIds.length) {
       return NextResponse.json(
         { error: 'Some products in your cart are no longer available.' },
         { status: 400 }
@@ -54,7 +56,6 @@ export async function POST(request: Request) {
 
       return {
         productId: product.id,
-        size: typeof item.size === 'string' && item.size.trim() ? item.size.trim() : null,
         quantity: item.quantity,
         price: product.price,
       }
