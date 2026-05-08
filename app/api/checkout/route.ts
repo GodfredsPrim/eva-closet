@@ -86,11 +86,9 @@ export async function POST(request: Request) {
       },
     })
 
-    try {
-      await sendOrderNotification(order)
-    } catch (notifyError) {
+    sendOrderNotification(order).catch((notifyError) => {
       console.error('Order notification failed:', notifyError)
-    }
+    })
 
     return NextResponse.json({
       success: true,
