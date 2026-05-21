@@ -64,6 +64,40 @@ EMAIL_USER=your-ethereal-user
 EMAIL_PASS=your-ethereal-pass
 ```
 
+### Production with Supabase and Vercel
+
+For Vercel deployment, use Supabase as the production database and set your production `DATABASE_URL` in Vercel environment variables.
+
+1. Create a Supabase project at https://app.supabase.com.
+2. In Supabase, go to Settings → Database → Connection string.
+3. Copy the `Connection string (URI)`.
+4. In Vercel dashboard, open your project and go to Settings → Environment Variables.
+5. Add `DATABASE_URL` and paste the Supabase URI as the value.
+6. Set the variable for the `Production` environment (and `Preview` if you want preview deploys to use the same DB).
+
+Example production value:
+
+```env
+DATABASE_URL="postgres://USER:PASSWORD@HOST:PORT/DATABASE"
+```
+
+Then run locally before pushing:
+
+```bash
+npx prisma generate
+npx prisma migrate deploy
+# or if you prefer
+npx prisma db push
+```
+
+Finally push to GitHub:
+
+```bash
+git add .
+git commit -m "Add Supabase production setup docs"
+git push origin main
+```
+
 ### Setting up Stripe
 
 1. Create a Stripe account at https://stripe.com
