@@ -17,11 +17,23 @@ interface Product {
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     fetch('/api/products')
-      .then(res => res.json())
-      .then(setProducts)
+      .then(async res => {
+        const data = await res.json()
+        if (!res.ok) {
+          throw new Error(data?.error || data?.message || 'Failed to fetch products')
+        }
+        setProducts(data)
+      })
+      .catch(err => {
+        console.error('Failed to load products:', err)
+        setError(err instanceof Error ? err.message : 'Unknown error')
+      })
+      .finally(() => setLoading(false))
   }, [])
 
   const container = {
@@ -54,18 +66,28 @@ export default function ProductsPage() {
         >
           Discover Amazing Products ✨
         </motion.h1>
-        <motion.div 
-          variants={container}
-          initial="hidden"
-          animate="show"
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
-        >
-          {products.map((product, index) => (
-            <motion.div key={product.id} variants={item}>
-              <ProductCard product={product} />
-            </motion.div>
-          ))}
-        </motion.div>
+        {loading ? (
+          <div className="text-center text-white">Loading products...</div>
+        ) : error ? (
+          <div className="text-center text-red-400">
+            Failed to load products: {error}
+          </div>
+        ) : products.length === 0 ? (
+          <div className="text-center text-white">No products found.</div>
+        ) : (
+          <motion.div 
+            variants={container}
+            initial="hidden"
+            animate="show"
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+          >
+            {products.map((product, index) => (
+              <motion.div key={product.id} variants={item}>
+                <ProductCard product={product} />
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
       </div>
     </motion.div>
   )
