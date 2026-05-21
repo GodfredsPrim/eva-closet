@@ -1,5 +1,11 @@
 import { PrismaClient } from '@prisma/client'
 
+if (!process.env.DATABASE_URL) {
+  throw new Error(
+    'DATABASE_URL is not defined. Set DATABASE_URL in your environment variables or Vercel project settings.'
+  )
+}
+
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
