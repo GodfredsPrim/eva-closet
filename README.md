@@ -78,8 +78,10 @@ For Vercel deployment, use Supabase as the production database and set your prod
 Example production value:
 
 ```env
-DATABASE_URL="postgres://USER:PASSWORD@HOST:PORT/DATABASE"
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=require"
 ```
+
+If your password includes special characters such as `@` or `%`, URL encode them first.
 
 Then run locally before pushing:
 
