@@ -1,22 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
-import path from 'path'
-import { mkdir, writeFile } from 'fs/promises'
+import { createClient } from '@supabase/supabase-js'
 import { prisma } from '@/lib/prisma'
 
-function sanitizeFilename(value: string) {
-  return value.replace(/[^a-zA-Z0-9.-]/g, '')
+function getSupabase() {
+  const url = process.env.SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_KEY
+  if (!url || !key) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_KEY must be set')
+  return createClient(url, key)
 }
 
-async function saveUploadedFile(file: File, folder: string) {
+async function uploadFile(file: File, folder: string): Promise<string> {
+  const supabase = getSupabase()
   const bytes = await file.arrayBuffer()
   const buffer = Buffer.from(bytes)
-  const filename = `${Date.now()}-${sanitizeFilename(file.name)}`
-  const filepath = path.join(process.cwd(), 'public', folder, filename)
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '')
+  const path = `${folder}/${Date.now()}-${safeName}`
 
-  await mkdir(path.dirname(filepath), { recursive: true })
-  await writeFile(filepath, buffer)
+  const { error } = await supabase.storage
+    .from('products')
+    .upload(path, buffer, { contentType: file.type, upsert: false })
 
-  return `/${folder}/${filename}`
+  if (error) throw error
+
+  const { data } = supabase.storage.from('products').getPublicUrl(path)
+  return data.publicUrl
 }
 
 export async function POST(request: NextRequest) {
@@ -36,7 +43,7 @@ export async function POST(request: NextRequest) {
     const category = formData.get('category') as string
     const sizes = (formData.get('sizes') as string)
       .split(',')
-      .map((size) => size.trim())
+      .map((s) => s.trim())
       .filter(Boolean)
       .join(', ')
 
@@ -44,27 +51,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    const imagePath = await saveUploadedFile(imageFile, 'images')
-    const videoPath =
+    const imageUrl = await uploadFile(imageFile, 'images')
+    const videoUrl =
       videoInput instanceof File && videoInput.size > 0
-        ? await saveUploadedFile(videoInput, 'videos')
+        ? await uploadFile(videoInput, 'videos')
         : null
 
     const product = await prisma.product.create({
-      data: {
-        name,
-        description,
-        price,
-        image: imagePath,
-        category,
-        sizes,
-        video: videoPath,
-      },
+      data: { name, description, price, image: imageUrl, category, sizes, video: videoUrl },
     })
 
     return NextResponse.json(product)
   } catch (error) {
-    console.error(error)
-    return NextResponse.json({ error: 'Failed to create product' }, { status: 500 })
+    console.error('POST /api/admin/products error:', error)
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return NextResponse.json({ error: 'Failed to create product', details: message }, { status: 500 })
   }
 }

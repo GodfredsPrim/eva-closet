@@ -1,18 +1,30 @@
 import type { NextRequest } from 'next/server'
-import { unlink } from 'fs/promises'
-import { join } from 'path'
+import { createClient } from '@supabase/supabase-js'
 import { prisma } from '@/lib/prisma'
 
-async function removePublicFile(filePath: string | null) {
-  if (!filePath) {
-    return
-  }
+function getSupabase() {
+  const url = process.env.SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_KEY
+  if (!url || !key) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_KEY must be set')
+  return createClient(url, key)
+}
 
+function storagePathFromUrl(publicUrl: string | null): string | null {
+  if (!publicUrl) return null
+  // Extract path after /storage/v1/object/public/products/
+  const marker = '/object/public/products/'
+  const idx = publicUrl.indexOf(marker)
+  return idx !== -1 ? publicUrl.slice(idx + marker.length) : null
+}
+
+async function deleteStorageFile(publicUrl: string | null) {
+  const path = storagePathFromUrl(publicUrl)
+  if (!path) return
   try {
-    const absolutePath = join(process.cwd(), 'public', filePath.replace(/^\/+/, ''))
-    await unlink(absolutePath)
+    const supabase = getSupabase()
+    await supabase.storage.from('products').remove([path])
   } catch (error) {
-    console.error('Failed to delete file:', error)
+    console.error('Failed to delete storage file:', error)
   }
 }
 
@@ -30,7 +42,7 @@ export async function PATCH(
     const category = body.category as string
     const sizes = (body.sizes as string)
       .split(',')
-      .map((size) => size.trim())
+      .map((s) => s.trim())
       .filter(Boolean)
       .join(', ')
 
@@ -40,13 +52,7 @@ export async function PATCH(
 
     const product = await prisma.product.update({
       where: { id },
-      data: {
-        name,
-        description,
-        price,
-        category,
-        sizes,
-      },
+      data: { name, description, price, category, sizes },
     })
 
     return Response.json(product)
@@ -63,20 +69,16 @@ export async function DELETE(
   try {
     const { id } = await context.params
 
-    const product = await prisma.product.findUnique({
-      where: { id },
-    })
+    const product = await prisma.product.findUnique({ where: { id } })
 
     if (!product) {
       return Response.json({ error: 'Product not found' }, { status: 404 })
     }
 
-    await removePublicFile(product.image)
-    await removePublicFile(product.video)
+    await deleteStorageFile(product.image)
+    await deleteStorageFile(product.video)
 
-    await prisma.product.delete({
-      where: { id },
-    })
+    await prisma.product.delete({ where: { id } })
 
     return Response.json({ success: true })
   } catch (error) {
